@@ -118,6 +118,10 @@ dialog#why::backdrop{background:rgba(42,26,30,.5)}
 #dtPlot{width:100%;cursor:crosshair}
 .treewrap{overflow-x:auto;margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--soft);padding:8px}
 #dtTree{max-width:none}
+.treewrap.fit #dtTree{width:100% !important;height:auto !important;max-width:100%}
+.treebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.treebar .spacer{flex:1}
+pre.rules{white-space:pre-wrap;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin:6px 0 0;overflow-x:auto}
 #dtTree .node{cursor:pointer}
 #dtTree text{font-family:"Source Sans 3",sans-serif;fill:var(--ink)}
 @keyframes grow{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
@@ -356,7 +360,21 @@ tr.prev td{outline:2px solid var(--new);outline-offset:-2px}
         <span class="hint" id="dtStats" style="margin:0"></span>
       </div>
       <p class="hint" style="margin-top:4px">Each cut on the chart becomes a question in the tree. A household answers "yes" or "no" at each question until it reaches a leaf, which predicts the majority class there. Click a question to review its calculation, or a leaf to work on it.</p>
-      <div class="treewrap"><svg id="dtTree" role="img" aria-label="Decision tree diagram"></svg></div>
+      <div class="treebar">
+        <label class="chk"><input type="checkbox" id="dtFit" checked> Fit the whole tree in the panel</label>
+        <span class="spacer"></span>
+        <button class="btn" id="dtCopyImg">Copy image</button>
+        <button class="btn" id="dtPng">Download PNG</button>
+        <button class="btn" id="dtSvg">Download SVG</button>
+        <span class="hint" id="dtExportMsg" role="status" style="margin:0"></span>
+      </div>
+      <div class="treewrap fit" id="dtTreeWrap"><svg id="dtTree" role="img" aria-label="Decision tree diagram"></svg></div>
+      <details class="block">
+        <summary>The tree as if–then rules</summary>
+        <p class="hint">Select and copy these into a slide, document or email.</p>
+        <pre id="dtRules" class="rules"></pre>
+        <div class="btns"><button class="btn" id="dtCopyRules">Copy rules</button></div>
+      </details>
       <details class="block">
         <summary>View or replace the data</summary>
         <p class="hint">One household per line: income ($000s), lot size (000s sq ft), Owner or Nonowner. Data: riding-mower example from Shmueli, Bruce et al., <i>Data Mining for Business Analytics</i>.</p>
@@ -1010,7 +1028,56 @@ function drawProg(){
   const last=steps[steps.length-1],removed=steps[0].h>0?(1-last.h/steps[0].h):0;
   $("dtProgSum").textContent=`${f3(steps[0].h)} → ${f3(last.h)} after ${steps.length-1} cut${steps.length===2?"":"s"} (${Math.round(removed*100)}% of the starting ${S} removed)`;
 }
-function renderAll(){drawPlot();drawCalc();drawGain();drawProg();drawTree();syncButtons();}
+function rulesText(){
+  const lines=[],S=D.imp==="gini"?"Gini":"entropy";
+  (function walk(n,conds){
+    if(!n.split){const pred=n.o>n.n?"OWNER":n.n>n.o?"NON-OWNER":"TIE";
+      lines.push(`IF ${conds.length?conds.join(" AND "):"(any household)"}\n   THEN ${pred}   [${n.o} owners, ${n.n} non-owners]`);return;}
+    const nm=NAME[n.split.v].toLowerCase(),t=fmtT(n.split.t);
+    walk(n.left,conds.concat(`${nm} < ${t}`));walk(n.right,conds.concat(`${nm} >= ${t}`));
+  })(D.tree,[]);
+  const L=leaves(),acc=L.reduce((s,l)=>s+Math.max(l.o,l.n),0)/D.data.length;
+  return `Riding-mower decision tree (${S}), ${L.length} leaves, training accuracy ${Math.round(acc*100)}%\nIncome in $000s, lot size in 000s sq ft\n\n`+lines.join("\n\n");
+}
+function exportSvgString(){
+  const src=$("dtTree"),clone=src.cloneNode(true),cs=getComputedStyle(document.documentElement);
+  const resolve=v=>v.replace(/var\((--[\w-]+)\)/g,(_,name)=>cs.getPropertyValue(name).trim()||"#000");
+  clone.querySelectorAll("*").forEach(e=>{["fill","stroke"].forEach(a=>{const v=e.getAttribute(a);if(v&&v.includes("var("))e.setAttribute(a,resolve(v));});e.removeAttribute("class");e.removeAttribute("tabindex");e.removeAttribute("role");});
+  clone.querySelectorAll('rect[stroke-width="3"]').forEach(r=>{r.setAttribute("stroke",cs.getPropertyValue("--line").trim());r.setAttribute("stroke-width","1.2");});
+  const vb=src.getAttribute("viewBox").split(" ").map(Number),w=vb[2],h=vb[3];
+  clone.setAttribute("xmlns",NS);clone.setAttribute("width",w);clone.setAttribute("height",h);clone.removeAttribute("style");clone.removeAttribute("id");
+  const bg=document.createElementNS(NS,"rect");bg.setAttribute("x",0);bg.setAttribute("y",0);bg.setAttribute("width",w);bg.setAttribute("height",h);bg.setAttribute("fill",cs.getPropertyValue("--panel").trim());
+  clone.insertBefore(bg,clone.firstChild);
+  const st=document.createElementNS(NS,"style");st.textContent=`text{font-family:"Source Sans 3",Helvetica,Arial,sans-serif;fill:${cs.getPropertyValue("--ink").trim()}}`;
+  clone.insertBefore(st,clone.firstChild);
+  return {svg:new XMLSerializer().serializeToString(clone),w,h};
+}
+function pngBlob(){
+  return new Promise((res,rej)=>{const {svg,w,h}=exportSvgString(),img=new Image(),scale=2;
+    img.onload=()=>{const c=document.createElement("canvas");c.width=w*scale;c.height=h*scale;const ctx=c.getContext("2d");ctx.scale(scale,scale);ctx.drawImage(img,0,0);c.toBlob(b=>b?res(b):rej(new Error("png")),"image/png");};
+    img.onerror=()=>rej(new Error("render"));img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);});
+}
+const msg=t=>{$("dtExportMsg").textContent=t;clearTimeout(msg._t);msg._t=setTimeout(()=>{$("dtExportMsg").textContent="";},5000);};
+async function saveFile(filename,blob){
+  // inside claude.ai: use the downloads capability; elsewhere (e.g. GitHub Pages): a normal download link
+  let dl=null;try{if(window.claude&&typeof window.claude.use==="function")dl=await window.claude.use("downloads");}catch(e){dl=null;}
+  if(dl){try{await dl.save({filename,data:blob});msg("Saved "+filename+".");}catch(e){msg(e&&e.code==="declined"?"Download cancelled.":"Downloads aren't available here. Try Copy image.");}return;}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);msg("Downloaded "+filename+".");
+}
+$("dtFit").onchange=e=>{$("dtTreeWrap").classList.toggle("fit",e.target.checked);};
+$("dtSvg").onclick=()=>{const {svg}=exportSvgString();saveFile("riding-mower-tree.svg",new Blob([svg],{type:"image/svg+xml"}));};
+$("dtPng").onclick=async()=>{try{saveFile("riding-mower-tree.png",await pngBlob());}catch(e){msg("Couldn't build the image. Try Download SVG.");}};
+$("dtCopyImg").onclick=async()=>{
+  try{if(!navigator.clipboard||!window.ClipboardItem)throw 0;
+    await navigator.clipboard.write([new ClipboardItem({"image/png":pngBlob()})]);msg("Tree copied. Paste it into a slide or document.");}
+  catch(e){msg("This browser blocked copying images here. Use Download PNG instead.");}
+};
+$("dtCopyRules").onclick=async()=>{
+  try{await navigator.clipboard.writeText(rulesText());msg("Rules copied.");}
+  catch(e){const r=document.createRange();r.selectNodeContents($("dtRules"));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);msg("Rules selected. Press Ctrl+C or ⌘C to copy.");}
+};
+function renderAll(){drawPlot();drawCalc();drawGain();drawProg();drawTree();$("dtRules").textContent=rulesText();syncButtons();}
 
 // ---------- interaction ----------
 function svgPt(e){const svg=$("dtPlot"),p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
