@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Classification lab: k-NN and decision trees</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F1F1; --panel:#FFFFFF; --ink:#2A1A1E; --muted:#6E5A5F; --line:#E2D9DA; --soft:#F8F4F2;
+  --stay:#FFCC33; --stay-ink:#2A1A1E; --ptstroke:#8C6A00; --cancel:#7A0019; --new:#E0A800; --star:#2A1A1E;
+  --accent:#7A0019; --accent-ink:#FFFFFF;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1A1214; --panel:#24191C; --ink:#F2E9EA; --muted:#B9A5A9; --line:#3D2B30; --soft:#2E2024;
+    --stay:#FFCC33; --stay-ink:#2A1A1E; --ptstroke:#24191C; --cancel:#D9536E; --new:#FFCC33; --star:#F2E9EA;
+    --accent:#FFCC33; --accent-ink:#2A1A1E;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1A1214; --panel:#24191C; --ink:#F2E9EA; --muted:#B9A5A9; --line:#3D2B30; --soft:#2E2024;
+  --stay:#FFCC33; --stay-ink:#2A1A1E; --ptstroke:#24191C; --cancel:#D9536E; --new:#FFCC33; --star:#F2E9EA;
+  --accent:#FFCC33; --accent-ink:#2A1A1E;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 48px}
+h1,h2,h3{font-family:"Bricolage Grotesque","Source Sans 3",system-ui,sans-serif;margin:0;letter-spacing:-0.01em}
+h1{font-size:clamp(28px,4vw,42px);font-weight:700;line-height:1.1}
+h2{font-size:22px;font-weight:700}
+h3{font-size:17px;font-weight:700}
+.lede{max-width:72ch;color:var(--muted);margin:10px 0 0;font-size:17px}
+.lede b{color:var(--ink);font-weight:600}
+.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;margin-top:22px}
+@media (max-width:920px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.plotcard{padding:12px 12px 14px}
+svg{display:block;max-width:100%;height:auto}
+#plot{width:100%;cursor:crosshair;touch-action:manipulation}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:14px;color:var(--muted);padding:4px 6px 10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 18px;padding:12px 6px 0;border-top:1px solid var(--line);margin-top:8px}
+.ctl label,.ctl .lab{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:5px}
+.ctl output{color:var(--ink);font-weight:700}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink);padding:6px 11px;font:600 14px "Source Sans 3",sans-serif;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button+button{border-left:1px solid var(--line)}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--new);outline-offset:2px}
+.steps{list-style:none;margin:12px 0 14px;padding:0;display:grid;gap:4px}
+.steps li{display:grid;grid-template-columns:28px 1fr;align-items:center;gap:10px;padding:6px 8px;border-radius:9px;color:var(--muted);font-weight:600}
+.steps li .n{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:13px}
+.steps li.done{color:var(--ink)}
+.steps li.done .n{background:var(--soft);border-color:var(--muted)}
+.steps li.now{background:var(--soft);color:var(--ink)}
+.steps li.now .n{background:var(--stay);border-color:var(--new);color:var(--stay-ink)}
+.narr{background:var(--soft);border-radius:10px;padding:12px 14px;min-height:96px;font-size:15.5px}
+.narr .math{font-variant-numeric:tabular-nums;display:block;margin-top:6px;padding:6px 10px;border-left:3px solid var(--new);background:var(--panel);border-radius:0 6px 6px 0;font-size:14.5px}
+.hint{font-size:14px;color:var(--muted);margin-top:8px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 14px;border-radius:9px;font:700 15px "Source Sans 3",sans-serif;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.block{margin-top:14px}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;font-size:13px}
+.tablewrap{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:9px}
+.tag{display:inline-block;padding:0 7px;border-radius:20px;font-size:12.5px;font-weight:700;color:#fff}
+.tag.c{background:var(--cancel)} .tag.s{background:var(--stay);color:var(--stay-ink)}
+.bar{display:grid;grid-template-columns:86px 1fr 52px;align-items:center;gap:8px;margin:6px 0;font-weight:600;font-size:14px}
+.bar .track{height:18px;background:var(--soft);border-radius:5px;overflow:hidden}
+.bar .fill{height:100%;width:0;transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums}
+.decision{border:2px solid var(--line);border-radius:12px;padding:12px 14px}
+.decision .act{font-family:"Bricolage Grotesque",sans-serif;font-size:21px;font-weight:700;line-height:1.2}
+.decision.over{border-color:var(--cancel)} .decision.hold{border-color:var(--stay)}
+.costs{font-size:14.5px;margin-top:8px;font-variant-numeric:tabular-nums}
+.costs div{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.costs div.win{font-weight:700}
+.lower{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;margin-top:18px}
+@media (max-width:920px){.lower{grid-template-columns:1fr}}
+.big{font-family:"Bricolage Grotesque",sans-serif;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.try{margin:8px 0 0;padding-left:20px}
+.try li{margin:6px 0}
+.hidden{display:none !important}
+.explain{margin:12px 6px 0;padding:10px 12px;border-radius:10px;background:var(--soft);font-size:14.5px;color:var(--ink)}
+.explain p{margin:0}.explain p+p{margin-top:6px}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font:700 14.5px "Source Sans 3",sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+dialog#why{border:1px solid var(--line);border-radius:16px;padding:0;max-width:min(680px,94vw);max-height:86vh;background:var(--panel);color:var(--ink);box-shadow:0 20px 60px rgba(40,10,20,.35)}
+dialog#why::backdrop{background:rgba(42,26,30,.5)}
+.why-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:4px solid var(--stay);background:var(--accent);color:var(--accent-ink)}
+.why-head h2{font-size:21px}
+.why-head button{border:0;background:transparent;color:inherit;font-size:26px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px}
+.why-body{padding:6px 20px 20px;overflow:auto;max-height:calc(86vh - 70px)}
+.why-body h3{margin:16px 0 4px}
+.why-body p{margin:0;max-width:68ch}
+.why-now{margin-top:14px;padding:10px 12px;background:var(--soft);border-left:4px solid var(--new);border-radius:0 8px 8px 0;font-size:15px}
+.why-try{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+#bound path.hit{cursor:help}
+#lines,#hood,#rings,#heat{pointer-events:none}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid var(--line);margin-bottom:22px}
+.tabs button{border:0;background:none;padding:8px 16px 10px;font:700 17px "Bricolage Grotesque","Source Sans 3",sans-serif;color:var(--muted);border-bottom:4px solid transparent;margin-bottom:-2px;cursor:pointer;text-align:left;line-height:1.2}
+.tabs button span{display:block;font:400 14px "Source Sans 3",sans-serif}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--stay)}
+[role=tabpanel][hidden]{display:none}
+.sel{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);font:600 14px "Source Sans 3",sans-serif}
+#dtPlot{width:100%;cursor:crosshair}
+.treewrap{overflow-x:auto;margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--soft);padding:8px}
+#dtTree{max-width:none}
+#dtTree .node{cursor:pointer}
+#dtTree text{font-family:"Source Sans 3",sans-serif;fill:var(--ink)}
+@keyframes grow{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+#dtTree .fresh{animation:grow .45s ease-out both}
+@media (prefers-reduced-motion: reduce){#dtTree .fresh{animation:none}}
+textarea#dtData{width:100%;font:14px/1.4 ui-monospace,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:9px;padding:8px;background:var(--panel);color:var(--ink)}
+details summary{cursor:pointer;font-weight:700;color:var(--accent)}
+.calc{font-variant-numeric:tabular-nums}
+.calc .where{color:var(--muted);font-size:14.5px;margin-top:4px}
+.calc .cut{font-family:"Bricolage Grotesque",sans-serif;font-size:20px;font-weight:700;margin:6px 0 2px}
+.calc .mode{font-size:13.5px;color:var(--muted)}
+.crow{display:grid;grid-template-columns:72px 1fr;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.crow .nm{font-weight:700;font-size:14.5px}
+.mix{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--soft)}
+.mix i{display:block;height:100%}
+.crow .f{grid-column:2;font-size:14px;color:var(--ink)}
+.crow .f small{color:var(--muted);font-size:13px}
+.igbox{margin-top:10px;padding:10px 12px;border-left:4px solid var(--new);background:var(--soft);border-radius:0 8px 8px 0;font-size:15px}
+.igbox .big{font-size:26px}
+tr.best td{font-weight:700;background:var(--soft)}
+tr.prev td{outline:2px solid var(--new);outline-offset:-2px}
+#dtCandBody tr{cursor:pointer}
+.g1{color:var(--cancel);font-weight:700}.g0{color:var(--ptstroke);font-weight:700}
+:root[data-theme="dark"] .g0{color:var(--stay)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .g0{color:var(--stay)}}
+
+.axis text{fill:var(--muted);font:13px "Source Sans 3",sans-serif}
+.axis line,.axis path{stroke:var(--line)}
+.axtitle{fill:var(--ink);font:600 13.5px "Source Sans 3",sans-serif}
+@keyframes pulse{0%{r:9;opacity:.9}100%{r:26;opacity:0}}
+.pulse{animation:pulse 1.4s ease-out infinite}
+@media (prefers-reduced-motion: reduce){.pulse{animation:none;opacity:0}.bar .fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs" role="tablist" aria-label="Simulations">
+    <button role="tab" id="tabbtn-knn" aria-controls="tab-knn" aria-selected="true">k-nearest neighbors<span>Hotel cancellations</span></button>
+    <button role="tab" id="tabbtn-dt" aria-controls="tab-dt" aria-selected="false" tabindex="-1">Decision tree<span>Riding-mower buyers</span></button>
+  </nav>
+  <section id="tab-knn" role="tabpanel" aria-labelledby="tabbtn-knn">
+  <h1>Will this booking cancel?</h1>
+  <p class="lede">Hotel Aurelia's revenue desk sees every new reservation arrive with two facts attached: how many days ahead it was booked, and the nightly rate. History shows which of those bookings were later <b>cancelled</b> and which guests <b>stayed</b>. k-nearest neighbors predicts a new booking's fate by asking: what happened to the k most similar bookings we've already seen? The desk then decides whether to resell (overbook) the room.</p>
+
+  <div class="grid">
+    <section class="card plotcard" aria-label="Booking history chart">
+      <div class="legend">
+        <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="var(--stay)" stroke="var(--ptstroke)"/></svg>Stayed</span>
+        <span><svg width="14" height="14"><rect x="2.5" y="2.5" width="9" height="9" fill="var(--cancel)" transform="rotate(45 7 7)"/></svg>Cancelled</span>
+        <span id="boundLeg"><svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="var(--ink)" stroke-width="2.6"/></svg>Decision boundary</span>
+        <span><svg width="16" height="16"><polygon points="8,1 10,6 15.5,6.2 11.2,9.6 12.8,15 8,11.8 3.2,15 4.8,9.6 0.5,6.2 6,6" fill="var(--star)" stroke="var(--new)" stroke-width="1.4"/></svg>New booking</span>
+        <span id="histInfo"></span>
+      </div>
+      <svg id="plot" viewBox="0 0 640 440" role="img" aria-label="Scatter plot of past bookings by lead time and nightly rate. Click to place a new booking.">
+        <g id="heat"></g>
+        <g id="axes" class="axis"></g>
+        <g id="bound"></g>
+        <g id="lines"></g>
+        <g id="hood"></g>
+        <g id="pts"></g>
+        <g id="rings"></g>
+        <g id="qg"></g>
+      </svg>
+      <div class="controls">
+        <div class="ctl">
+          <label for="k">Neighbors (k): <output id="kOut">7</output></label>
+          <input id="k" type="range" min="1" max="41" step="2" value="7">
+        </div>
+        <div class="ctl">
+          <span class="lab">Feature scaling</span>
+          <div class="seg" id="scaleSeg">
+            <button data-v="std" aria-pressed="true">Standardized</button>
+            <button data-v="raw" aria-pressed="false">Raw units</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="lab">Distance</span>
+          <div class="seg" id="metricSeg">
+            <button data-v="euclid" aria-pressed="true">Euclidean</button>
+            <button data-v="manhattan" aria-pressed="false">Manhattan</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="lab">Voting</span>
+          <div class="seg" id="voteSeg">
+            <button data-v="equal" aria-pressed="true">One vote each</button>
+            <button data-v="weighted" aria-pressed="false">Closer counts more</button>
+          </div>
+        </div>
+        <div class="ctl" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
+          <label class="chk"><input type="checkbox" id="boundChk" checked> Show decision boundary</label>
+          <label class="chk"><input type="checkbox" id="heatChk"> Shade decision regions</label>
+          <button class="btn" id="reseed" style="align-self:flex-start">Draw new history</button>
+        </div>
+      </div>
+      <div class="explain" id="explain"></div>
+    </section>
+
+    <section class="card" aria-label="Step-by-step walkthrough">
+      <h2>Walk through one prediction</h2>
+      <ol class="steps" id="steps">
+        <li data-s="1"><span class="n">1</span>Place a new booking</li>
+        <li data-s="2"><span class="n">2</span>Measure distance to every past booking</li>
+        <li data-s="3"><span class="n">3</span>Keep the k nearest</li>
+        <li data-s="4"><span class="n">4</span>Let the neighbors vote</li>
+        <li data-s="5"><span class="n">5</span>Turn the vote into a decision</li>
+      </ol>
+      <div class="narr" id="narr" aria-live="polite"></div>
+      <div class="btns">
+        <button class="btn primary" id="nextBtn">Next step</button>
+        <button class="btn" id="playBtn">Play all steps</button>
+        <button class="btn" id="randBtn">Random booking</button>
+        <button class="btn" id="resetBtn">Clear</button>
+      </div>
+
+      <div class="block hidden" id="tableBlock">
+        <h3>The <span id="kLabel">7</span> nearest past bookings</h3>
+        <div class="tablewrap" style="margin-top:6px">
+          <table><thead><tr><th>Rank</th><th>Lead (days)</th><th>Rate (€)</th><th>Distance</th><th>Vote</th><th>Outcome</th></tr></thead><tbody id="nbBody"></tbody></table>
+        </div>
+      </div>
+
+      <div class="block hidden" id="voteBlock">
+        <h3>The vote</h3>
+        <div class="bar"><span>Cancelled</span><div class="track"><div class="fill" id="fillC" style="background:var(--cancel)"></div></div><span class="v" id="vC"></span></div>
+        <div class="bar"><span>Stayed</span><div class="track"><div class="fill" id="fillS" style="background:var(--stay)"></div></div><span class="v" id="vS"></span></div>
+      </div>
+
+      <div class="block hidden" id="decBlock">
+        <div class="decision" id="decision">
+          <div class="act" id="decAct"></div>
+          <div class="costs" id="decCosts"></div>
+        </div>
+        <div class="ctl" style="margin-top:12px">
+          <label for="thr">Overbook when P(cancel) ≥ <output id="thrOut">50%</output></label>
+          <input id="thr" type="range" min="0.05" max="0.95" step="0.01" value="0.5">
+          <button class="btn" id="beBtn" style="margin-top:6px">Use cost break-even (67%)</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="card" aria-label="Accuracy by k">
+      <h2>How does k affect accuracy?</h2>
+      <p class="hint" style="margin-top:4px">Each point scores k-NN on the 140 past bookings it learned from (dashed) and on 100 held-out bookings it has never seen (solid). The gold band marks your current k. <button class="linkbtn" data-why>Why does accuracy peak in the middle?</button></p>
+      <svg id="evalSvg" viewBox="0 0 640 250" role="img" aria-label="Line chart of training and holdout accuracy across values of k"></svg>
+    </section>
+    <section class="card" aria-label="Business cost and suggestions">
+      <h2>What it costs the hotel</h2>
+      <p class="hint" style="margin-top:4px">An unsold room after a surprise cancellation loses <b>€150</b>. Overbooking a guest who does show up means walking them to another hotel: <b>€300</b>. With your k, settings and threshold, on the held-out bookings:</p>
+      <div class="big" id="costBig">€0</div>
+      <div class="hint" id="costDetail"></div>
+      <h3 style="margin-top:14px">Things to try in class</h3>
+      <ol class="try">
+        <li>Set k = 1 and turn on the decision map. Notice the islands around single bookings, then compare training and held-out accuracy.</li>
+        <li>Switch to raw units. The neighborhood stretches tall because a €1 gap counts the same as a 1-day gap, so the rate barely matters.</li>
+        <li>Move the threshold to the break-even point. Why is it 300 ÷ (150 + 300), and not 50%?</li>
+      </ol>
+    </section>
+  </div>
+  </section>
+  <section id="tab-dt" role="tabpanel" aria-labelledby="tabbtn-dt" hidden>
+    <h1>Who will buy a riding mower?</h1>
+    <p class="lede">A lawn-equipment maker wants to know which households to target with its riding-mower campaign. It surveyed 24 households: 12 already <b>own</b> a riding mower and 12 <b>don't</b>. For each one it knows two things: household income and lot size. A decision tree learns simple yes/no rules by cutting the chart into rectangles, each cut chosen to make the groups on either side as pure as possible.</p>
+
+    <div class="grid">
+      <section class="card plotcard" aria-label="Riding mower households chart">
+        <div class="legend">
+          <span><svg width="14" height="14"><rect x="2.5" y="2.5" width="9" height="9" fill="var(--cancel)" transform="rotate(45 7 7)"/></svg>Owner</span>
+          <span><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="var(--stay)" stroke="var(--ptstroke)"/></svg>Non-owner</span>
+          <span><svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="var(--new)" stroke-width="3" stroke-dasharray="5 3"/></svg>Cut being tested</span>
+          <span id="dtInfo"></span>
+        </div>
+        <svg id="dtPlot" viewBox="0 0 640 440" role="img" aria-label="Scatter plot of households by income and lot size. Hover to test a cut, click to make it.">
+          <g id="dtRegions"></g><g id="dtAxes" class="axis"></g><g id="dtSplits"></g><g id="dtPreview"></g><g id="dtPts"></g><g id="dtSel"></g>
+        </svg>
+        <div class="controls">
+          <div class="ctl">
+            <span class="lab">Cut direction</span>
+            <div class="seg" id="dtDirSeg">
+              <button data-v="inc" aria-pressed="true">Vertical: income</button>
+              <button data-v="lot" aria-pressed="false">Horizontal: lot size</button>
+            </div>
+          </div>
+          <div class="ctl">
+            <span class="lab">Impurity measure</span>
+            <div class="seg" id="dtImpSeg">
+              <button data-v="entropy" aria-pressed="true">Entropy</button>
+              <button data-v="gini" aria-pressed="false">Gini</button>
+            </div>
+          </div>
+          <div class="ctl">
+            <label for="dtDepth">When growing, stop at depth</label>
+            <select id="dtDepth" class="sel"><option value="99">No limit (pure leaves)</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>
+          </div>
+        </div>
+        <div class="btns" style="padding:0 6px">
+          <button class="btn primary" id="dtBest">Make the best cut here</button>
+          <button class="btn primary" id="dtGrow">Grow the rest of the tree</button>
+          <button class="btn" id="dtUndo">Undo last cut</button>
+          <button class="btn" id="dtReset">Start over</button>
+        </div>
+        <p class="hint" style="padding:0 6px">Hover over a region to test a cut there, then click to make it. Cuts snap halfway between neighboring households, because any position in that gap separates the same people.</p>
+      </section>
+
+      <section class="card" aria-label="Information gain calculation">
+        <h2 id="dtCalcTitle">Information gain for this cut</h2>
+        <div id="dtCalc" aria-live="polite"></div>
+        <div class="block">
+          <h3 id="dtGainTitle">Every possible cut in this region</h3>
+          <svg id="dtGain" viewBox="0 0 420 170" role="img" aria-label="Bar chart of gain for each candidate cut"></svg>
+          <div id="dtCompare" class="hint" style="margin-top:4px"></div>
+        </div>
+        <div class="block">
+          <div class="tablewrap">
+            <table><thead><tr><th>Cut</th><th>Yes side</th><th>No side</th><th id="dtGainHead">Gain</th></tr></thead><tbody id="dtCandBody"></tbody></table>
+          </div>
+          <p class="hint">Click a row to make that cut.</p>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:18px" aria-label="Entropy reduction by cut">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px">
+        <h2 id="dtProgTitle">How much entropy is left after each cut?</h2>
+        <span class="hint" id="dtProgSum" style="margin:0"></span>
+      </div>
+      <p class="hint" style="margin-top:4px" id="dtProgHint"></p>
+      <svg id="dtProg" viewBox="0 0 900 250" role="img" aria-label="Line chart of remaining weighted entropy after each cut, with bars showing each cut's reduction"></svg>
+    </section>
+
+    <section class="card" style="margin-top:18px" aria-label="Decision tree diagram">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px">
+        <h2>The tree so far</h2>
+        <span class="hint" id="dtStats" style="margin:0"></span>
+      </div>
+      <p class="hint" style="margin-top:4px">Each cut on the chart becomes a question in the tree. A household answers "yes" or "no" at each question until it reaches a leaf, which predicts the majority class there. Click a question to review its calculation, or a leaf to work on it.</p>
+      <div class="treewrap"><svg id="dtTree" role="img" aria-label="Decision tree diagram"></svg></div>
+      <details class="block">
+        <summary>View or replace the data</summary>
+        <p class="hint">One household per line: income ($000s), lot size (000s sq ft), Owner or Nonowner. Data: riding-mower example from Shmueli, Bruce et al., <i>Data Mining for Business Analytics</i>.</p>
+        <textarea id="dtData" rows="10" spellcheck="false"></textarea>
+        <div class="btns"><button class="btn primary" id="dtUse">Use this data</button><button class="btn" id="dtRestore">Restore riding-mower data</button><span class="hint" id="dtDataMsg"></span></div>
+      </details>
+    </section>
+  </section>
+</div>
+
+<dialog id="why" aria-labelledby="whyTitle">
+  <div class="why-head"><h2 id="whyTitle">Why small k makes islands</h2><button id="whyClose" aria-label="Close">×</button></div>
+  <div class="why-body">
+    <div class="why-now" id="whyNow"></div>
+    <h3>At k = 1, every booking claims its own territory</h3>
+    <p>The prediction anywhere on the chart is simply the outcome of the single closest past booking. The chart splits into one region per booking (Voronoi cells). A kept booking sitting among cancellations gets its own gold region, and the boundary has to loop around it. That loop is an island.</p>
+    <h3>Many oddball bookings are just noise</h3>
+    <p>Each past outcome was drawn at random from its true cancellation probability. A booking with an 85% chance of cancelling still had a 15% chance of being kept. That gold dot in the maroon zone is luck, not a rule. At k = 1 the model memorizes every lucky outcome, which is why training accuracy is 100% while held-out accuracy drops.</p>
+    <h3>Larger k turns each prediction into a local average</h3>
+    <p>At k = 15 the oddball is one vote among fifteen and gets outvoted, so its island disappears. An island only survives if a whole cluster of same-outcome bookings sits together, which is far more likely to be a real pattern.</p>
+    <h3>Overlapping neighborhoods make the boundary smooth</h3>
+    <p>Nudge a new booking slightly and at k = 1 its one neighbor can switch, flipping the prediction from 0% to 100%. At k = 15 a small move swaps maybe one neighbor in fifteen, shifting the vote by about 7 points. Predictions change gradually, so the boundary becomes a smooth curve.</p>
+    <h3>This is the bias–variance trade-off</h3>
+    <p>As a rule of thumb, k-NN behaves as if it has about n ÷ k effective parameters. Small k: low bias, high variance; the boundary would look completely different with a new history. Large k: more bias, low variance.</p>
+    <h3>Too large a k erases real patterns too</h3>
+    <p>Early-bird promo bookings (far ahead, low rate) genuinely rarely cancel. A moderate k keeps that pocket as a legitimate island. At k = 41 it gets outvoted by its high-risk surroundings. At k = 140, every prediction is the overall cancellation rate and there is no boundary at all.</p>
+    <h3>See it for yourself</h3>
+    <p>Each button sets k and shows the boundary. Then press "Draw new history" a few times and compare how much the boundary moves.</p>
+    <div class="why-try">
+      <button class="btn" data-setk="1">Memorizes noise: k = 1</button>
+      <button class="btn primary" data-setk="15">Learns the pattern: k = 15</button>
+      <button class="btn" data-setk="41">Washes out detail: k = 41</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+"use strict";
+// ---------- geometry ----------
+const ML=58, MR=16, MT=14, MB=48, VW=640, VH=440, W=VW-ML-MR, H=VH-MT-MB;
+const L0=0, L1=365, P0=70, P1=210;
+const X=l=>ML+(l-L0)/(L1-L0)*W, Y=p=>MT+(1-(p-P0)/(P1-P0))*H;
+const Xi=x=>L0+(x-ML)/W*(L1-L0), Yi=y=>P0+(1-(y-MT)/H)*(P1-P0);
+const NS="http://www.w3.org/2000/svg";
+const $=id=>document.getElementById(id);
+const el=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;};
+const reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const tween=(ms,fn)=>new Promise(res=>{if(reduce||ms<=0){fn(1);res();return;}const t0=performance.now();const f=now=>{const t=Math.min(1,(now-t0)/ms);fn(t);t<1?requestAnimationFrame(f):res();};requestAnimationFrame(f);});
+const ease=t=>1-Math.pow(1-t,3);
+const fmt=(v,d=1)=>Number(v).toFixed(d);
+const pct=v=>Math.round(v*100)+"%";
+
+// ---------- state ----------
+const S={bound:true,seed:11,train:[],test:[],q:null,step:0,k:7,scale:"std",metric:"euclid",weighted:false,heat:false,thr:0.5,mL:0,mP:0,sdL:1,sdP:1,res:null,busy:false};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gen(seed){
+  const r=mulberry32(seed);
+  const norm=()=>{let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  const one=()=>{
+    let lead=r()<0.4?-Math.log(1-r())*45:25+r()*335;
+    lead=Math.max(0,Math.min(360,Math.round(lead)));
+    let price=Math.round(Math.max(75,Math.min(205,140+norm()*28)));
+    let z=-2.6+0.011*lead+0.035*(price-140);
+    if(lead>200&&price<115)z-=2.2;      // non-refundable early-bird promo
+    if(lead<25&&price>170)z-=1.0;       // last-minute business travellers
+    const p=1/(1+Math.exp(-z));
+    return {lead,price,y:r()<p?1:0};
+  };
+  const train=[],test=[];for(let i=0;i<140;i++)train.push(one());for(let i=0;i<100;i++)test.push(one());
+  return {train,test};
+}
+function stats(){
+  const n=S.train.length;S.mL=S.train.reduce((a,p)=>a+p.lead,0)/n;S.mP=S.train.reduce((a,p)=>a+p.price,0)/n;
+  S.sdL=Math.sqrt(S.train.reduce((a,p)=>a+(p.lead-S.mL)**2,0)/(n-1));S.sdP=Math.sqrt(S.train.reduce((a,p)=>a+(p.price-S.mP)**2,0)/(n-1));
+}
+function diffs(a,b){let dx=a.lead-b.lead,dy=a.price-b.price;if(S.scale==="std"){dx/=S.sdL;dy/=S.sdP;}return [dx,dy];}
+function dist(a,b){const [dx,dy]=diffs(a,b);return S.metric==="euclid"?Math.hypot(dx,dy):Math.abs(dx)+Math.abs(dy);}
+function knn(q,k){
+  const all=S.train.map((p,i)=>({p,i,d:dist(q,p)})).sort((a,b)=>a.d-b.d);
+  const nb=all.slice(0,k);let wc=0,ws=0;
+  nb.forEach(n=>{n.w=S.weighted?1/(n.d+1e-3):1;ws+=n.w;if(n.p.y)wc+=n.w;});
+  return {all,nb,p:wc/ws,nC:nb.filter(n=>n.p.y).length,wC:wc,wS:ws-wc};
+}
+
+// ---------- drawing: axes & points ----------
+function drawAxes(){
+  const g=$("axes");g.innerHTML="";
+  for(let l=0;l<=360;l+=60){el("line",{x1:X(l),x2:X(l),y1:MT,y2:MT+H,"stroke-dasharray":"2 4"},g);const t=el("text",{x:X(l),y:MT+H+18,"text-anchor":"middle"},g);t.textContent=l;}
+  for(let p=80;p<=200;p+=20){el("line",{x1:ML,x2:ML+W,y1:Y(p),y2:Y(p),"stroke-dasharray":"2 4"},g);const t=el("text",{x:ML-8,y:Y(p)+4,"text-anchor":"end"},g);t.textContent="€"+p;}
+  el("rect",{x:ML,y:MT,width:W,height:H,fill:"none",stroke:"var(--line)"},g);
+  const a=el("text",{x:ML+W/2,y:VH-8,"text-anchor":"middle",class:"axtitle"},g);a.textContent="Lead time: days between booking and arrival";
+  const b=el("text",{x:16,y:MT+H/2,"text-anchor":"middle",class:"axtitle",transform:`rotate(-90 16 ${MT+H/2})`},g);b.textContent="Nightly rate";
+}
+function drawPoints(){
+  const g=$("pts");g.innerHTML="";
+  S.train.forEach((p,i)=>{
+    const cx=X(p.lead),cy=Y(p.price);let s;
+    if(p.y)s=el("rect",{x:cx-4.6,y:cy-4.6,width:9.2,height:9.2,fill:"var(--cancel)",transform:`rotate(45 ${cx} ${cy})`,"data-i":i},g);
+    else s=el("circle",{cx,cy,r:5.2,fill:"var(--stay)","data-i":i},g);
+    s.setAttribute("stroke",p.y?"var(--panel)":"var(--ptstroke)");s.setAttribute("stroke-width",p.y?"1":"1.1");
+    const t=el("title",{},s);t.textContent=`Booked ${p.lead} days ahead at €${p.price}/night: ${p.y?"cancelled":"stayed"}`;
+  });
+  const nC=S.train.filter(p=>p.y).length;
+  $("histInfo").textContent=`${S.train.length} past bookings, ${nC} cancelled (${pct(nC/S.train.length)})`;
+}
+function dimPoints(set){
+  $("pts").querySelectorAll("[data-i]").forEach(e=>{e.style.opacity=set&&!set.has(+e.dataset.i)?0.28:1;});
+}
+function drawHeat(){
+  const g=$("heat");g.innerHTML="";if(!S.heat)return;
+  const nx=64,ny=40,cw=W/nx,ch=H/ny;
+  for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){
+    const q={lead:Xi(ML+(i+.5)*cw),price:Yi(MT+(j+.5)*ch)};
+    const p=knn(q,S.k).p;
+    el("rect",{x:ML+i*cw,y:MT+j*ch,width:cw+.4,height:ch+.4,fill:p>=S.thr?"var(--cancel)":"var(--stay)",opacity:(0.08+0.30*Math.abs(p-S.thr)/Math.max(S.thr,1-S.thr)).toFixed(3)},g);
+  }
+}
+
+function drawBoundary(){
+  const g=$("bound");g.innerHTML="";$("boundLeg").style.display=S.bound?"":"none";if(!S.bound)return;
+  const nx=96,ny=60,dx=W/nx,dy=H/ny,v=[];
+  for(let j=0;j<=ny;j++){const row=[];for(let i=0;i<=nx;i++){row.push(knn({lead:Xi(ML+i*dx),price:Yi(MT+j*dy)},S.k).p-S.thr+1e-9);}v.push(row);}
+  const segs=[];
+  const lerp=(a,b)=>a/(a-b);
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+    const a=v[j][i],b=v[j][i+1],c=v[j+1][i+1],d=v[j+1][i];
+    const x0=ML+i*dx,y0=MT+j*dy,pts=[];
+    if((a>0)!==(b>0))pts.push([x0+lerp(a,b)*dx,y0]);
+    if((b>0)!==(c>0))pts.push([x0+dx,y0+lerp(b,c)*dy]);
+    if((d>0)!==(c>0))pts.push([x0+lerp(d,c)*dx,y0+dy]);
+    if((a>0)!==(d>0))pts.push([x0,y0+lerp(a,d)*dy]);
+    if(pts.length===2)segs.push(pts);
+    else if(pts.length===4){segs.push([pts[0],pts[3]]);segs.push([pts[1],pts[2]]);}
+  }
+  const d=segs.map(s=>`M${s[0][0].toFixed(1)},${s[0][1].toFixed(1)}L${s[1][0].toFixed(1)},${s[1][1].toFixed(1)}`).join("");
+  el("path",{d,fill:"none",stroke:"var(--panel)","stroke-width":5.5,"stroke-linecap":"round",opacity:.8},g);
+  el("path",{d,fill:"none",stroke:"var(--ink)","stroke-width":2.4,"stroke-linecap":"round"},g);
+  const hit=el("path",{d,fill:"none",stroke:"transparent","stroke-width":14,"pointer-events":"stroke",class:"hit"},g);
+  el("title",{},hit).textContent="Click to learn why the boundary looks like this";
+  hit.addEventListener("click",e=>{e.stopPropagation();openWhy();});
+}
+function explain(){
+  const vote=S.weighted?
+    `<p><b>Closer counts more:</b> each neighbor's vote is weighted by 1 ÷ distance, so a booking twice as close carries twice the say. P(cancel) = total weight of the cancelled neighbors ÷ total weight of all k neighbors. The "Vote" column in the table shows each neighbor's share.</p>`:
+    `<p><b>One vote each:</b> every one of the k neighbors counts the same, whether it is the closest booking or only just made the cut. P(cancel) is simply a head count: cancelled neighbors ÷ k. With k = 7 and 5 cancellations, that's 5/7 = 71%.</p>`;
+  const bd=S.bound?`<p><b>Decision boundary:</b> the black line separates bookings the desk would overbook (P(cancel) ≥ ${pct(S.thr)}) from bookings it would hold. Any new booking that lands on the far side gets the opposite decision. Move k, the scaling or the threshold and watch it redraw.</p>`:"";
+  $("explain").innerHTML=vote+bd+`<p style="margin-top:8px"><button class="linkbtn" data-why>Why does a small k create islands? Learn more</button>${S.bound?' <span class="hint">(or click the boundary line)</span>':''}</p>`;
+}
+
+// ---------- the new booking ----------
+function drawQ(){
+  const g=$("qg");g.innerHTML="";if(!S.q)return;
+  const cx=X(S.q.lead),cy=Y(S.q.price);
+  if(S.step<5)el("circle",{cx,cy,r:9,fill:"none",stroke:"var(--new)","stroke-width":2.5,class:"pulse"},g);
+  const R=11,r=4.6,pts=[];for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r:R;pts.push((cx+rr*Math.cos(a)).toFixed(1)+","+(cy+rr*Math.sin(a)).toFixed(1));}
+  let fill="var(--star)";if(S.step>=5&&S.res)fill=S.res.p>=S.thr?"var(--cancel)":"var(--stay)";
+  el("polygon",{points:pts.join(" "),fill,stroke:"var(--new)","stroke-width":2,"stroke-linejoin":"round"},g);
+}
+function clearLayers(){["lines","hood","rings"].forEach(id=>$(id).innerHTML="");dimPoints(null);}
+
+async function drawLines(anim){
+  const g=$("lines");g.innerHTML="";const cx=X(S.q.lead),cy=Y(S.q.price);
+  const res=S.res,n=res.all.length;
+  const items=res.all.map((a,rank)=>{
+    const op=0.06+0.5*Math.pow(1-rank/n,3);
+    const ln=el("line",{x1:cx,y1:cy,x2:cx,y2:cy,stroke:"var(--muted)","stroke-width":rank<S.k?1.4:.8,opacity:op.toFixed(3)},g);
+    return {ln,tx:X(a.p.lead),ty:Y(a.p.price),delay:Math.random()*0.7};
+  });
+  await tween(anim?1300:0,t=>{items.forEach(it=>{const u=ease(Math.max(0,Math.min(1,(t-it.delay)/0.3)));it.ln.setAttribute("x2",cx+(it.tx-cx)*u);it.ln.setAttribute("y2",cy+(it.ty-cy)*u);});});
+}
+function hoodShape(r){
+  // radius r in distance units -> half-widths in data units -> pixels
+  const rxD=S.scale==="std"?r*S.sdL:r, ryD=S.scale==="std"?r*S.sdP:r;
+  return {rx:rxD/(L1-L0)*W, ry:ryD/(P1-P0)*H};
+}
+async function drawHood(anim){
+  const lines=$("lines");
+  const nbSet=new Set(S.res.nb.map(n=>n.i));
+  [...lines.children].forEach((ln,rank)=>{ln.style.transition=reduce?"none":"opacity .5s";ln.setAttribute("opacity",rank<S.k?0.75:0);ln.setAttribute("stroke",rank<S.k?"var(--ink)":"var(--muted)");});
+  dimPoints(nbSet);
+  const g=$("hood");g.innerHTML="";const rg=$("rings");rg.innerHTML="";
+  const cx=X(S.q.lead),cy=Y(S.q.price),r=S.res.nb[S.res.nb.length-1].d,{rx,ry}=hoodShape(r);
+  const shape=S.metric==="euclid"?el("ellipse",{cx,cy,rx:0,ry:0},g):el("polygon",{points:`${cx},${cy}`},g);
+  shape.setAttribute("fill","var(--new)");shape.setAttribute("fill-opacity","0.12");shape.setAttribute("stroke","var(--ink)");shape.setAttribute("stroke-width","2");shape.setAttribute("stroke-dasharray","6 4");
+  await tween(anim?800:0,t=>{const u=ease(t);
+    if(S.metric==="euclid"){shape.setAttribute("rx",rx*u);shape.setAttribute("ry",ry*u);}
+    else shape.setAttribute("points",`${cx-rx*u},${cy} ${cx},${cy-ry*u} ${cx+rx*u},${cy} ${cx},${cy+ry*u}`);
+  });
+  S.res.nb.forEach((n,idx)=>{
+    el("circle",{cx:X(n.p.lead),cy:Y(n.p.price),r:9,fill:"none",stroke:"var(--ink)","stroke-width":1.6},rg);
+    if(S.k<=15){const t=el("text",{x:X(n.p.lead)+9,y:Y(n.p.price)-8,fill:"var(--ink)","font-size":"11.5","font-weight":"700","font-family":"Source Sans 3, sans-serif"},rg);t.textContent=idx+1;}
+  });
+}
+
+// ---------- panel ----------
+function setSteps(){
+  document.querySelectorAll("#steps li").forEach(li=>{const s=+li.dataset.s;li.classList.toggle("done",s<S.step);li.classList.toggle("now",s===S.step);});
+  $("nextBtn").disabled=S.step>=5||S.busy;$("playBtn").disabled=S.step>=5||S.busy;
+  $("nextBtn").textContent=S.step===0?"Draw a booking and start":"Next step";
+}
+function describeQ(){return `booked <b>${Math.round(S.q.lead)} days ahead</b> at <b>€${Math.round(S.q.price)}/night</b>`;}
+function narrate(){
+  const N=$("narr");const q=S.q;
+  if(S.step===0){N.innerHTML="Click anywhere on the chart to drop in a new reservation, or let the simulation draw one. Each dot is a past booking, placed by its lead time and nightly rate.";return;}
+  if(S.step===1){N.innerHTML=`A new reservation just came in, ${describeQ()}. We don't know yet whether this guest will show up. k-NN has no fitted equation to consult: its entire "model" is the history on the chart.`;return;}
+  if(S.step===2){
+    const n=S.res.nb[0],[dx,dy]=diffs(q,n.p),rl=Math.round(q.lead-n.p.lead),rp=Math.round(q.price-n.p.price);
+    let m;
+    if(S.scale==="std"){
+      const a=`${rl} ÷ ${fmt(S.sdL,0)} = ${fmt(dx,2)}`,b=`${rp} ÷ ${fmt(S.sdP,0)} = ${fmt(dy,2)}`;
+      m=`Closest booking: lead gap ${a} sd, rate gap ${b} sd<br>`+(S.metric==="euclid"?`distance = √(${fmt(dx,2)}² + ${fmt(dy,2)}²) = ${fmt(n.d,3)}`:`distance = |${fmt(dx,2)}| + |${fmt(dy,2)}| = ${fmt(n.d,3)}`);
+    }else{
+      m=`Closest booking: lead gap ${rl} days, rate gap €${rp}<br>`+(S.metric==="euclid"?`distance = √(${rl}² + ${rp}²) = ${fmt(n.d,1)}`:`distance = |${rl}| + |${rp}| = ${fmt(n.d,1)}`);
+    }
+    N.innerHTML=`We compute the distance from the new booking to all ${S.train.length} past bookings. Darker lines are closer.<span class="math">${m}</span>`+
+      (S.scale==="raw"?`<div class="hint">Raw units: one day of lead time counts the same as one euro. Lead time spans 365 days but the rate only €140, so lead time dominates.</div>`:`<div class="hint">Standardized: each gap is divided by that feature's standard deviation (${fmt(S.sdL,0)} days, €${fmt(S.sdP,0)}), so both features get a fair say.</div>`);
+    return;
+  }
+  if(S.step===3){
+    const r=S.res.nb[S.res.nb.length-1].d;
+    N.innerHTML=`Sort by distance and keep the top <b>k = ${S.k}</b>. The dashed ${S.metric==="euclid"?"ellipse":"diamond"} reaches exactly to the ${S.k===1?"nearest":S.k+"th-nearest"} booking (distance ${fmt(r,S.scale==="std"?2:1)}).`+
+      `<div class="hint">${S.scale==="raw"?"It's stretched tall because in raw units the rate barely affects distance. Try Standardized.":S.metric==="manhattan"?"Manhattan distance adds the gaps, which makes the neighborhood a diamond.":"Its shape shows what 'similar' means under the current scaling and distance."}</div>`;
+    return;
+  }
+  if(S.step===4){
+    const {nC,p}=S.res;
+    N.innerHTML=S.weighted?
+      `Each neighbor votes with weight 1 ÷ distance, so the closest bookings carry more say. Weighted share cancelling: <b>${pct(p)}</b> (${nC} of ${S.k} neighbors cancelled).`:
+      `Each neighbor gets one vote. <b>${nC} of ${S.k}</b> similar bookings were cancelled, so k-NN estimates P(cancel) = ${nC}/${S.k} = <b>${pct(p)}</b>.`;
+    return;
+  }
+  if(S.step===5){
+    N.innerHTML=`The estimate becomes an action. If P(cancel) clears the threshold, the desk resells the room; otherwise it holds it. The threshold is a business choice, not a statistical one. Try changing k now: the whole walkthrough updates instantly.`;
+  }
+}
+function fillTable(){
+  $("kLabel").textContent=S.k;const tot=S.res.nb.reduce((a,n)=>a+n.w,0);
+  $("nbBody").innerHTML=S.res.nb.map((n,i)=>`<tr><td>${i+1}</td><td>${n.p.lead}</td><td>${n.p.price}</td><td>${fmt(n.d,S.scale==="std"?3:1)}</td><td>${S.weighted?pct(n.w/tot):"1"}</td><td><span class="tag ${n.p.y?"c":"s"}">${n.p.y?"Cancelled":"Stayed"}</span></td></tr>`).join("");
+}
+function fillVotes(){
+  const {p,nC}=S.res;
+  $("vC").textContent=S.weighted?pct(p):`${nC} / ${S.k}`;$("vS").textContent=S.weighted?pct(1-p):`${S.k-nC} / ${S.k}`;
+  requestAnimationFrame(()=>{$("fillC").style.width=(p*100)+"%";$("fillS").style.width=((1-p)*100)+"%";});
+}
+function fillDecision(){
+  const p=S.res.p,over=p>=S.thr;
+  const d=$("decision");d.className="decision "+(over?"over":"hold");
+  $("decAct").textContent=over?"Overbook: resell this room":"Hold the room for this guest";
+  const eOver=300*(1-p),eHold=150*p;
+  $("decCosts").innerHTML=`<div>P(cancel) from the vote<span>${pct(p)}</span></div>`+
+    `<div class="${eOver<eHold?"win":""}">Expected cost if we overbook: €300 × ${pct(1-p)}<span>€${fmt(eOver,0)}</span></div>`+
+    `<div class="${eHold<=eOver?"win":""}">Expected cost if we hold: €150 × ${pct(p)}<span>€${fmt(eHold,0)}</span></div>`+
+    `<p class="hint" style="margin:8px 0 0">${(eOver<eHold)===over?"Your threshold picks the cheaper option for this booking.":"Your threshold picks the more expensive option here. The break-even threshold always picks the cheaper one."}</p>`;
+}
+function syncPanel(){
+  setSteps();narrate();
+  $("tableBlock").classList.toggle("hidden",S.step<3);
+  $("voteBlock").classList.toggle("hidden",S.step<4);
+  $("decBlock").classList.toggle("hidden",S.step<5);
+  if(S.step>=3)fillTable();if(S.step>=4)fillVotes();if(S.step>=5)fillDecision();
+  if(S.step<4){$("fillC").style.width="0";$("fillS").style.width="0";}
+}
+
+// ---------- step machine ----------
+function placeQ(lead,price){
+  S.q={lead:Math.max(0,Math.min(365,lead)),price:Math.max(P0,Math.min(P1,price))};
+  S.step=1;S.res=knn(S.q,S.k);clearLayers();drawQ();syncPanel();
+}
+function randomQ(){const r=Math.random;placeQ(Math.round(20+r()*320),Math.round(90+r()*105));}
+async function next(){
+  if(S.busy||S.step>=5)return;
+  if(S.step===0){randomQ();return;}
+  S.busy=true;S.step++;setSteps();
+  if(S.step===2){narrate();await drawLines(true);}
+  else if(S.step===3){await drawHood(true);}
+  else if(S.step===5){drawQ();}
+  S.busy=false;syncPanel();
+}
+async function playAll(){
+  if(S.step===0)randomQ();
+  while(S.step<5){await next();await new Promise(r=>setTimeout(r,reduce?0:650));}
+}
+async function refresh(){
+  // redraw current step instantly after a setting change
+  if(S.q){S.res=knn(S.q,S.k);
+    if(S.step>=2)await drawLines(false);
+    if(S.step>=3)await drawHood(false);
+    drawQ();
+  }
+  drawHeat();drawBoundary();explain();syncPanel();drawEval();
+}
+
+// ---------- evaluation ----------
+function accuracyAt(k,data,isTrain){
+  let correct=0,cost=0;
+  data.forEach(pt=>{
+    const all=S.train.map(p=>({p,d:dist(pt,p)})).sort((a,b)=>a.d-b.d).slice(0,k);
+    let wc=0,ws=0;all.forEach(n=>{const w=S.weighted?1/(n.d+1e-3):1;ws+=w;if(n.p.y)wc+=w;});
+    const p=wc/ws;
+    if((p>=0.5?1:0)===pt.y)correct++;
+    if(!isTrain){const pred=p>=S.thr;if(pred&&!pt.y)cost+=300;if(!pred&&pt.y)cost+=150;}
+  });
+  return {acc:correct/data.length,cost};
+}
+function drawEval(){
+  const svg=$("evalSvg");svg.innerHTML="";
+  const ml=48,mr=14,mt=14,mb=40,w=640-ml-mr,h=250-mt-mb;
+  const ks=[];for(let k=1;k<=41;k+=2)ks.push(k);
+  const tr=ks.map(k=>accuracyAt(k,S.train,true).acc), te=ks.map(k=>accuracyAt(k,S.test,false).acc);
+  const lo=Math.max(0,Math.floor((Math.min(...tr,...te)-0.05)*10)/10),hi=1;
+  const x=k=>ml+(k-1)/40*w,y=a=>mt+(1-(a-lo)/(hi-lo))*h;
+  const g=el("g",{class:"axis"},svg);
+  for(let a=lo;a<=hi+1e-9;a+=0.1){el("line",{x1:ml,x2:ml+w,y1:y(a),y2:y(a),"stroke-dasharray":"2 4"},g);const t=el("text",{x:ml-6,y:y(a)+4,"text-anchor":"end"},g);t.textContent=pct(a);}
+  ks.filter(k=>(k-1)%8===0).forEach(k=>{const t=el("text",{x:x(k),y:mt+h+18,"text-anchor":"middle"},g);t.textContent=k;});
+  const at=el("text",{x:ml+w/2,y:248,"text-anchor":"middle",class:"axtitle"},g);at.textContent="k (number of neighbors)";
+  el("line",{x1:x(S.k),x2:x(S.k),y1:mt,y2:mt+h,stroke:"var(--new)","stroke-width":8,opacity:.45},svg);
+  const path=arr=>arr.map((a,i)=>(i?"L":"M")+x(ks[i]).toFixed(1)+","+y(a).toFixed(1)).join("");
+  el("path",{d:path(tr),fill:"none",stroke:"var(--muted)","stroke-width":2,"stroke-dasharray":"5 4"},svg);
+  el("path",{d:path(te),fill:"none",stroke:"var(--ink)","stroke-width":2.6},svg);
+  te.forEach((a,i)=>{const c=el("circle",{cx:x(ks[i]),cy:y(a),r:ks[i]===S.k?5.5:3,fill:"var(--ink)"},svg);const t=el("title",{},c);t.textContent=`k=${ks[i]}: held-out ${pct(a)}, training ${pct(tr[i])}`;});
+  const lg=el("g",{},svg);
+  el("line",{x1:ml+w-200,x2:ml+w-176,y1:mt+h-14,y2:mt+h-14,stroke:"var(--muted)","stroke-width":2,"stroke-dasharray":"5 4"},lg);
+  const t1=el("text",{x:ml+w-170,y:mt+h-10,class:"axtitle"},lg);t1.textContent="Training";
+  el("line",{x1:ml+w-104,x2:ml+w-80,y1:mt+h-14,y2:mt+h-14,stroke:"var(--ink)","stroke-width":2.6},lg);
+  const t2=el("text",{x:ml+w-74,y:mt+h-10,class:"axtitle"},lg);t2.textContent="Held-out";
+  // cost box
+  const cur=accuracyAt(S.k,S.test,false);
+  $("costBig").textContent="€"+Math.round(cur.cost/S.test.length*100).toLocaleString()+" per 100 bookings";
+  $("costDetail").textContent=`Held-out accuracy at k = ${S.k}: ${pct(cur.acc)}. Threshold: overbook at P(cancel) ≥ ${pct(S.thr)}.`;
+}
+
+// ---------- wiring ----------
+function svgPoint(evt){const svg=$("plot"),pt=svg.createSVGPoint();pt.x=evt.clientX;pt.y=evt.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse());}
+$("plot").addEventListener("click",e=>{if(S.busy)return;const p=svgPoint(e);if(p.x<ML||p.x>ML+W||p.y<MT||p.y>MT+H)return;placeQ(Math.round(Xi(p.x)),Math.round(Yi(p.y)));});
+$("nextBtn").onclick=next;$("playBtn").onclick=playAll;$("randBtn").onclick=()=>{if(!S.busy)randomQ();};
+$("resetBtn").onclick=()=>{if(S.busy)return;S.q=null;S.step=0;S.res=null;clearLayers();drawQ();syncPanel();};
+$("k").oninput=e=>{S.k=+e.target.value;$("kOut").textContent=S.k;if(!S.busy)refresh();};
+function seg(id,key,map){$(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{if(S.busy)return;$(id).querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));S[key]=map(b.dataset.v);refresh();});}
+seg("scaleSeg","scale",v=>v);seg("metricSeg","metric",v=>v);seg("voteSeg","weighted",v=>v==="weighted");
+$("heatChk").onchange=e=>{S.heat=e.target.checked;drawHeat();};
+$("boundChk").onchange=e=>{S.bound=e.target.checked;drawBoundary();explain();};
+$("thr").oninput=e=>{S.thr=+e.target.value;$("thrOut").textContent=pct(S.thr);drawQ();if(S.step>=5)fillDecision();drawHeat();drawBoundary();explain();drawEval();};
+$("beBtn").onclick=()=>{$("thr").value=(300/450).toFixed(2);$("thr").dispatchEvent(new Event("input"));};
+$("reseed").onclick=()=>{if(S.busy)return;S.seed=Math.floor(Math.random()*1e6);init(false);};
+
+function openWhy(){
+  const n=S.train.length,nC=S.train.filter(p=>p.y).length;
+  $("whyNow").innerHTML=`Right now: <b>k = ${S.k}</b> with ${n} past bookings, so roughly <b>${fmt(n/S.k,0)} effective parameters</b>. `+
+    (S.k<=3?"Expect a jagged boundary with islands around single bookings.":S.k<=25?"Each prediction averages enough neighbors to outvote lone oddballs.":"Predictions drift toward the overall cancellation rate ("+pct(nC/n)+"), and real pockets start to vanish.");
+  const d=$("why");if(typeof d.showModal==="function")d.showModal();else d.setAttribute("open","");
+}
+function closeWhy(){const d=$("why");if(typeof d.close==="function")d.close();else d.removeAttribute("open");}
+document.addEventListener("click",e=>{if(e.target.closest("[data-why]"))openWhy();});
+$("whyClose").onclick=closeWhy;
+$("why").addEventListener("click",e=>{if(e.target===$("why"))closeWhy();});
+$("why").querySelectorAll("[data-setk]").forEach(b=>b.onclick=()=>{
+  const k=+b.dataset.setk;$("k").value=k;$("boundChk").checked=true;S.bound=true;$("k").dispatchEvent(new Event("input"));closeWhy();
+  $("plot").scrollIntoView({behavior:reduce?"auto":"smooth",block:"center"});
+});
+
+function init(first){
+  const d=gen(S.seed);S.train=d.train;S.test=d.test;stats();
+  if(first)drawAxes();drawPoints();
+  if(S.q){S.step=Math.min(S.step,1);S.res=knn(S.q,S.k);}
+  clearLayers();drawQ();drawHeat();drawBoundary();explain();syncPanel();drawEval();
+}
+init(true);
+})();
+</script>
+<script>
+// ---------- tabs ----------
+(function(){
+  const tabs=[...document.querySelectorAll('[role=tab]')];
+  function show(id){tabs.forEach(t=>{const on=t.getAttribute("aria-controls")===id;t.setAttribute("aria-selected",on);t.tabIndex=on?0:-1;document.getElementById(t.getAttribute("aria-controls")).hidden=!on;});try{history.replaceState(null,"","#"+id.replace("tab-",""));}catch(e){}}
+  tabs.forEach((t,i)=>{t.onclick=()=>show(t.getAttribute("aria-controls"));t.onkeydown=e=>{if(e.key==="ArrowRight"||e.key==="ArrowLeft"){const n=tabs[(i+(e.key==="ArrowRight"?1:tabs.length-1))%tabs.length];n.focus();n.click();}};});
+  if(location.hash==="#dt")show("tab-dt");
+})();
+
+// ---------- decision tree ----------
+(function(){
+"use strict";
+const DEF=`60.0,18.4,Owner
+85.5,16.8,Owner
+64.8,21.6,Owner
+61.5,20.8,Owner
+87.0,23.6,Owner
+110.1,19.2,Owner
+108.0,17.6,Owner
+82.8,22.4,Owner
+69.0,20.0,Owner
+93.0,20.8,Owner
+51.0,22.0,Owner
+81.0,20.0,Owner
+75.0,19.6,Nonowner
+52.8,20.8,Nonowner
+64.8,17.2,Nonowner
+43.2,20.4,Nonowner
+84.0,17.6,Nonowner
+49.2,17.6,Nonowner
+59.4,16.0,Nonowner
+66.0,18.4,Nonowner
+47.4,16.4,Nonowner
+33.0,18.8,Nonowner
+51.0,14.0,Nonowner
+63.0,14.8,Nonowner`;
+const NS="http://www.w3.org/2000/svg",$=id=>document.getElementById(id);
+const el=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;};
+const reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep=ms=>new Promise(r=>setTimeout(r,reduce?0:ms));
+const ML=58,MR=16,MT=14,MB=48,VW=640,VH=440,W=VW-ML-MR,H=VH-MT-MB;
+const NAME={inc:"Income",lot:"Lot size"},UNIT={inc:v=>"$"+fmtT(v)+"k",lot:v=>fmtT(v)+"k sq ft"};
+function fmtT(t){return (Math.round(t*100)/100).toString();}
+const f3=v=>v.toFixed(3);
+
+const D={data:[],tree:null,nid:0,hist:[],dir:"inc",imp:"entropy",sel:null,inspect:null,prev:null,busy:false,stop:false,maxDepth:99,xr:[0,1],yr:[0,1],drawn:new Set()};
+let X,Y,Xi,Yi;
+
+function parse(txt){
+  const rows=[];txt.split(/\r?\n/).forEach(line=>{const p=line.split(/[,;\t]/).map(s=>s.trim());if(p.length<3)return;
+    const a=parseFloat(p[0]),b=parseFloat(p[1]);if(isNaN(a)||isNaN(b))return;const c=p[2].toLowerCase();
+    rows.push({inc:a,lot:b,y:(c.startsWith("o")||c==="1"||c==="yes"||c.startsWith("buy"))?1:0});});
+  return rows;
+}
+function setup(data){
+  D.data=data;D.nid=0;D.hist=[];D.inspect=null;D.prev=null;D.drawn=new Set();
+  const xs=data.map(d=>d.inc),ys=data.map(d=>d.lot);
+  D.xr=[Math.floor((Math.min(...xs)-5)/10)*10,Math.ceil((Math.max(...xs)+5)/10)*10];
+  D.yr=[Math.floor(Math.min(...ys)-1),Math.ceil(Math.max(...ys)+1)];
+  X=v=>ML+(v-D.xr[0])/(D.xr[1]-D.xr[0])*W;Y=v=>MT+(1-(v-D.yr[0])/(D.yr[1]-D.yr[0]))*H;
+  Xi=x=>D.xr[0]+(x-ML)/W*(D.xr[1]-D.xr[0]);Yi=y=>D.yr[0]+(1-(y-MT)/H)*(D.yr[1]-D.yr[0]);
+  D.tree=mk(data.map((_,i)=>i),{x0:D.xr[0],x1:D.xr[1],y0:D.yr[0],y1:D.yr[1]},0);
+  D.sel=D.tree;drawAxes();renderAll();
+}
+function mk(idx,b,depth){const o=idx.filter(i=>D.data[i].y).length;return {id:D.nid++,idx,b,depth,o,n:idx.length-o,split:null,left:null,right:null};}
+function imp(o,n){const N=o+n;if(!N)return 0;const p=o/N,q=n/N;
+  if(D.imp==="gini")return 1-p*p-q*q;return -(p?p*Math.log2(p):0)-(q?q*Math.log2(q):0);}
+function cands(node,v){
+  const vals=[...new Set(node.idx.map(i=>D.data[i][v]))].sort((a,b)=>a-b),out=[],Hp=imp(node.o,node.n),N=node.idx.length;
+  for(let k=0;k<vals.length-1;k++){
+    const t=(vals[k]+vals[k+1])/2;let lo=0,ln=0;
+    node.idx.forEach(i=>{if(D.data[i][v]<t){D.data[i].y?lo++:ln++;}});
+    const ro=node.o-lo,rn=node.n-ln,wl=(lo+ln)/N,wr=(ro+rn)/N,Hl=imp(lo,ln),Hr=imp(ro,rn);
+    out.push({v,t,lo,ln,ro,rn,Hp,Hl,Hr,wl,wr,gain:Hp-(wl*Hl+wr*Hr)});
+  }
+  return out;
+}
+function best(node,v){const all=v?cands(node,v):cands(node,"inc").concat(cands(node,"lot"));let b=null;all.forEach(c=>{if(!b||c.gain>b.gain+1e-12)b=c;});return b;}
+const pure=n=>n.o===0||n.n===0;
+function leaves(n=D.tree,a=[]){if(!n.split)a.push(n);else{leaves(n.left,a);leaves(n.right,a);}return a;}
+function nodes(n=D.tree,a=[]){a.push(n);if(n.split){nodes(n.left,a);nodes(n.right,a);}return a;}
+function leafAt(x,y){let n=D.tree;while(n.split)n=((n.split.v==="inc"?x:y)<n.split.t)?n.left:n.right;return n;}
+function apply(node,v,t){
+  const L=node.idx.filter(i=>D.data[i][v]<t),R=node.idx.filter(i=>D.data[i][v]>=t);if(!L.length||!R.length)return;
+  const bl={...node.b},br={...node.b};if(v==="inc"){bl.x1=t;br.x0=t;}else{bl.y1=t;br.y0=t;}
+  node.split={v,t,num:D.hist.length+1};node.left=mk(L,bl,node.depth+1);node.right=mk(R,br,node.depth+1);
+  D.hist.push(node);D.inspect=null;D.prev=null;
+  D.sel=!pure(node.left)?node.left:!pure(node.right)?node.right:(nextImpure()||node.left);
+}
+function nextImpure(){const q=[D.tree];while(q.length){const n=q.shift();if(!n.split){if(!pure(n))return n;}else q.push(n.left,n.right);}return null;}
+function describe(b){
+  const p=[];if(b.x0>D.xr[0])p.push(`income ≥ ${fmtT(b.x0)}`);if(b.x1<D.xr[1])p.push(`income < ${fmtT(b.x1)}`);
+  if(b.y0>D.yr[0])p.push(`lot size ≥ ${fmtT(b.y0)}`);if(b.y1<D.yr[1])p.push(`lot size < ${fmtT(b.y1)}`);
+  return p.length?"Households with "+p.join(" and "):"All households";
+}
+
+// ---------- chart ----------
+function drawAxes(){
+  const g=$("dtAxes");g.innerHTML="";
+  for(let v=D.xr[0];v<=D.xr[1];v+=10){el("line",{x1:X(v),x2:X(v),y1:MT,y2:MT+H,"stroke-dasharray":"2 4"},g);if((v-D.xr[0])%20===0){const t=el("text",{x:X(v),y:MT+H+18,"text-anchor":"middle"},g);t.textContent="$"+v+"k";}}
+  for(let v=D.yr[0];v<=D.yr[1];v+=2){el("line",{x1:ML,x2:ML+W,y1:Y(v),y2:Y(v),"stroke-dasharray":"2 4"},g);const t=el("text",{x:ML-8,y:Y(v)+4,"text-anchor":"end"},g);t.textContent=v+"k";}
+  el("rect",{x:ML,y:MT,width:W,height:H,fill:"none",stroke:"var(--line)"},g);
+  el("text",{x:ML+W/2,y:VH-8,"text-anchor":"middle",class:"axtitle"},g).textContent="Household income ($000s)";
+  el("text",{x:16,y:MT+H/2,"text-anchor":"middle",class:"axtitle",transform:`rotate(-90 16 ${MT+H/2})`},g).textContent="Lot size (000s sq ft)";
+}
+const rectOf=b=>({x:X(b.x0),y:Y(b.y1),w:X(b.x1)-X(b.x0),h:Y(b.y0)-Y(b.y1)});
+function countsText(g,x,y,o,n,anchor){
+  const t=el("text",{x,y,"text-anchor":anchor||"start","font-size":"13","font-weight":"700","font-family":"Source Sans 3, sans-serif"},g);
+  const a=el("tspan",{fill:"var(--cancel)"},t);a.textContent=o+"◆ ";const b=el("tspan",{fill:"var(--ink)"},t);b.textContent=n+"●";return t;
+}
+function drawPlot(){
+  const rg=$("dtRegions");rg.innerHTML="";
+  leaves().forEach(l=>{const r=rectOf(l.b),N=l.o+l.n,pur=N?Math.max(l.o,l.n)/N:0;
+    const col=l.o>l.n?"var(--cancel)":l.n>l.o?"var(--stay)":"none";
+    el("rect",{x:r.x,y:r.y,width:r.w,height:r.h,fill:col,opacity:(0.05+0.25*(pur-0.5)*2).toFixed(3)},rg);
+    if(D.hist.length&&r.w>44&&r.h>22)countsText(rg,r.x+6,r.y+17,l.o,l.n);
+  });
+  const sg=$("dtSplits");sg.innerHTML="";
+  nodes().filter(n=>n.split).forEach(n=>{const b=n.b,s=n.split;let x1,y1,x2,y2;
+    if(s.v==="inc"){x1=x2=X(s.t);y1=Y(b.y0);y2=Y(b.y1);}else{y1=y2=Y(s.t);x1=X(b.x0);x2=X(b.x1);}
+    el("line",{x1,y1,x2,y2,stroke:"var(--ink)","stroke-width":D.inspect===n?4:2.2},sg);
+    const cx=s.v==="inc"?x1:x2-12,cy=s.v==="inc"?y2+12:y1;
+    el("circle",{cx,cy,r:9,fill:"var(--accent)",stroke:"var(--panel)","stroke-width":1.5},sg);
+    el("text",{x:cx,y:cy+4,"text-anchor":"middle","font-size":"11.5","font-weight":"700",fill:"var(--accent-ink)","font-family":"Source Sans 3, sans-serif"},sg).textContent=s.num;
+  });
+  const pg=$("dtPts");if(!pg.childNodes.length||pg.dataset.n!=D.data.length){pg.innerHTML="";pg.dataset.n=D.data.length;
+    D.data.forEach(d=>{const cx=X(d.inc),cy=Y(d.lot);let s;
+      if(d.y)s=el("rect",{x:cx-5,y:cy-5,width:10,height:10,fill:"var(--cancel)",stroke:"var(--panel)","stroke-width":1,transform:`rotate(45 ${cx} ${cy})`},pg);
+      else s=el("circle",{cx,cy,r:5.6,fill:"var(--stay)",stroke:"var(--ptstroke)","stroke-width":1.1},pg);
+      el("title",{},s).textContent=`Income $${d.inc}k, lot ${d.lot}k sq ft: ${d.y?"owner":"non-owner"}`;});}
+  const selg=$("dtSel");selg.innerHTML="";
+  const focus=D.prev?D.prev.node:D.sel;
+  if(focus&&!focus.split){const r=rectOf(focus.b);el("rect",{x:r.x+1.5,y:r.y+1.5,width:Math.max(0,r.w-3),height:Math.max(0,r.h-3),fill:"none",stroke:"var(--new)","stroke-width":3,"stroke-dasharray":"7 4","pointer-events":"none"},selg);}
+  drawPreview();
+  const nO=D.data.filter(d=>d.y).length;$("dtInfo").textContent=`${D.data.length} households, ${nO} owners`;
+}
+function activeCut(){
+  if(D.prev)return {node:D.prev.node,c:D.prev.c,mode:"hover"};
+  if(D.inspect){const s=D.inspect.split;const c=cands(D.inspect,s.v).find(c=>Math.abs(c.t-s.t)<1e-9);return {node:D.inspect,c,mode:"inspect"};}
+  if(D.sel&&!D.sel.split&&!pure(D.sel)){return {node:D.sel,c:best(D.sel),mode:"best"};}
+  return {node:D.sel,c:null,mode:"none"};
+}
+function drawPreview(){
+  const g=$("dtPreview");g.innerHTML="";const a=activeCut();if(!a.c||a.mode==="inspect")return;
+  const b=a.node.b,c=a.c;let x1,y1,x2,y2;
+  if(c.v==="inc"){x1=x2=X(c.t);y1=Y(b.y0);y2=Y(b.y1);}else{y1=y2=Y(c.t);x1=X(b.x0);x2=X(b.x1);}
+  el("line",{x1,y1,x2,y2,stroke:"var(--new)","stroke-width":3.2,"stroke-dasharray":"8 5"},g);
+  const r=rectOf(b);
+  if(c.v==="inc"){countsText(g,X(c.t)-8,r.y+r.h-10,c.lo,c.ln,"end");countsText(g,X(c.t)+8,r.y+r.h-10,c.ro,c.rn,"start");}
+  else{countsText(g,r.x+r.w-8,Y(c.t)+18,c.lo,c.ln,"end");countsText(g,r.x+r.w-8,Y(c.t)-8,c.ro,c.rn,"end");}
+}
+
+// ---------- calculation panel ----------
+function formula(o,n){
+  const N=o+n,s=D.imp==="gini"?"G":"H";
+  if(!N)return `${s} = 0`;
+  if(o===0||n===0)return `${s} = 0 <small>(pure: everyone is the same)</small>`;
+  if(D.imp==="gini")return `${s} = 1 − (${o}/${N})² − (${n}/${N})² = <b>${f3(imp(o,n))}</b>`;
+  return `${s} = −(${o}/${N})·log₂(${o}/${N}) − (${n}/${N})·log₂(${n}/${N}) = <b>${f3(imp(o,n))}</b>`;
+}
+function mixBar(o,n){const N=o+n||1;return `<div class="mix"><i style="width:${o/N*100}%;background:var(--cancel)"></i><i style="width:${n/N*100}%;background:var(--stay)"></i></div>`;}
+function row(name,o,n){return `<div class="crow"><span class="nm">${name}</span>${mixBar(o,n)}<div class="f"><span class="g1">${o} owners</span>, <span class="g0">${n} non-owners</span> (n = ${o+n})<br>${formula(o,n)}</div></div>`;}
+function drawCalc(){
+  const a=activeCut(),G=D.imp==="gini",gainName=G?"Gini decrease":"Information gain",s=G?"G":"H";
+  $("dtCalcTitle").textContent=gainName+" for this cut";$("dtGainHead").textContent=G?"Gini decrease":"Gain";
+  const box=$("dtCalc");const node=a.node;
+  if(!a.c){
+    box.innerHTML=`<div class="calc"><div class="where">${describe(node.b)}</div>${row("This group",node.o,node.n)}<div class="igbox">${pure(node)?"This region is already pure, so no cut can improve it. Pick another region, or grow the rest of the tree.":"Hover over a region to test a cut."}</div></div>`;return;
+  }
+  const c=a.c,N=c.lo+c.ln+c.ro+c.rn,w=c.wl*c.Hl+c.wr*c.Hr;
+  const mode={hover:"You're testing this cut. Click to make it.",best:"The best cut available in the highlighted region.",inspect:`Cut #${node.split&&node.split.num}, already in the tree.`}[a.mode];
+  box.innerHTML=`<div class="calc">
+    <div class="where">${describe(node.b)}</div>
+    <div class="cut">Is ${NAME[c.v].toLowerCase()} &lt; ${fmtT(c.t)}?</div><div class="mode">${mode}</div>
+    ${row("Before",node.o,node.n)}${row("Yes side",c.lo,c.ln)}${row("No side",c.ro,c.rn)}
+    <div class="igbox">Weighted ${G?"Gini":"entropy"} after the cut = ${c.lo+c.ln}/${N} × ${f3(c.Hl)} + ${c.ro+c.rn}/${N} × ${f3(c.Hr)} = ${f3(w)}<br>
+    ${gainName} = ${f3(c.Hp)} − ${f3(w)} = <span class="big">${f3(c.gain)}</span></div>
+    <p class="hint">${G?"Gini impurity is the chance two households drawn at random from the group belong to different classes: 0 when pure, 0.5 at 50/50.":"Entropy measures how mixed a group is: 0 when everyone is the same, 1 at a 50/50 split."} The gain is how much the cut lowers the average impurity, weighting each side by its size. The tree always takes the largest gain, then repeats inside each new region.</p></div>`;
+}
+function drawGain(){
+  const svg=$("dtGain");svg.innerHTML="";const a=activeCut(),node=a.node,body=$("dtCandBody");
+  const v=a.mode==="inspect"?a.c.v:(a.mode==="hover"?a.c.v:D.dir);
+  $("dtGainTitle").textContent=`Every possible ${NAME[v].toLowerCase()} cut in this region`;
+  if(!node||node.split&&a.mode!=="inspect"||node.idx.length<2){body.innerHTML="";$("dtCompare").textContent="";return;}
+  const cs=cands(node,v);if(!cs.length){body.innerHTML="";$("dtCompare").textContent="";return;}
+  const bv=best(node,v),bi=best(node,v==="inc"?"lot":"inc");
+  const ml=40,mr=10,mt=10,mb=30,w=420-ml-mr,h=170-mt-mb;
+  const lo=v==="inc"?node.b.x0:node.b.y0,hi=v==="inc"?node.b.x1:node.b.y1;
+  const gmax=Math.max(0.05,...cs.map(c=>c.gain));
+  const x=t=>ml+(t-lo)/(hi-lo)*w,y=g=>mt+(1-Math.max(0,g)/gmax)*h;
+  const ax=el("g",{class:"axis"},svg);
+  [0,gmax/2,gmax].forEach(g=>{el("line",{x1:ml,x2:ml+w,y1:y(g),y2:y(g),"stroke-dasharray":"2 4"},ax);el("text",{x:ml-5,y:y(g)+4,"text-anchor":"end"},ax).textContent=g.toFixed(2);});
+  el("line",{x1:ml,x2:ml+w,y1:mt+h,y2:mt+h},ax);
+  el("text",{x:ml,y:166,"text-anchor":"start"},ax).textContent=fmtT(lo);el("text",{x:ml+w,y:166,"text-anchor":"end"},ax).textContent=fmtT(hi);
+  el("text",{x:ml+w/2,y:166,"text-anchor":"middle",class:"axtitle"},ax).textContent=NAME[v]+" cut position";
+  const pc=a.c&&a.c.v===v?a.c.t:null;
+  cs.forEach(c=>{const isB=Math.abs(c.t-bv.t)<1e-9,isP=pc!==null&&Math.abs(c.t-pc)<1e-9;
+    const r=el("rect",{x:x(c.t)-3,y:y(c.gain),width:6,height:Math.max(1,mt+h-y(c.gain)),fill:isP?"var(--new)":isB?"var(--accent)":"var(--muted)",opacity:isP||isB?1:.55},svg);
+    el("title",{},r).textContent=`${NAME[v]} < ${fmtT(c.t)}: gain ${f3(c.gain)}`;});
+  const winner=bv.gain>=bi.gain?bv:bi;
+  const line=c=>`${NAME[c.v]} &lt; ${fmtT(c.t)} (gain ${f3(c.gain)})`;
+  $("dtCompare").innerHTML=`Best ${NAME[bv.v].toLowerCase()} cut: ${winner===bv?"<b>"+line(bv)+"</b>":line(bv)}. Best ${NAME[bi.v].toLowerCase()} cut: ${winner===bi?"<b>"+line(bi)+"</b>":line(bi)}. The tree picks the bigger one.`;
+  body.innerHTML=cs.map((c,i)=>{const isB=Math.abs(c.t-bv.t)<1e-9,isP=pc!==null&&Math.abs(c.t-pc)<1e-9;
+    return `<tr data-i="${i}" class="${isB?"best":""} ${isP?"prev":""}"><td>&lt; ${fmtT(c.t)}</td><td><span class="g1">${c.lo}◆</span> <span class="g0">${c.ln}●</span></td><td><span class="g1">${c.ro}◆</span> <span class="g0">${c.rn}●</span></td><td>${f3(c.gain)}</td></tr>`;}).join("");
+  body.querySelectorAll("tr").forEach(tr=>tr.onclick=()=>{if(D.busy||a.mode==="inspect")return;const c=cs[+tr.dataset.i];apply(node,c.v,c.t);renderAll();});
+}
+
+// ---------- tree diagram ----------
+function drawTree(){
+  const svg=$("dtTree");svg.innerHTML="";
+  const NW=150,NH=66,GX=14,LH=100;let li=0,maxD=0;
+  (function lay(n){maxD=Math.max(maxD,n.depth);if(!n.split){n._x=10+li*(NW+GX)+NW/2;li++;}else{lay(n.left);lay(n.right);n._x=(n.left._x+n.right._x)/2;}n._y=12+n.depth*LH;})(D.tree);
+  const Wt=Math.max(li*(NW+GX)+20,320),Ht=(maxD+1)*LH;
+  svg.setAttribute("viewBox",`0 0 ${Wt} ${Ht}`);svg.setAttribute("width",Wt);svg.setAttribute("height",Ht);
+  const eg=el("g",{},svg),ng=el("g",{},svg),S=D.imp==="gini"?"G":"H";
+  nodes().forEach(n=>{
+    const fresh=!D.drawn.has(n.id);
+    if(n.split)[["yes",n.left],["no",n.right]].forEach(([lab,ch])=>{
+      const g=el("g",{class:!D.drawn.has(ch.id)?"fresh":""},eg);
+      el("path",{d:`M${n._x},${n._y+NH} C${n._x},${n._y+NH+20} ${ch._x},${ch._y-20} ${ch._x},${ch._y}`,fill:"none",stroke:"var(--muted)","stroke-width":1.6},g);
+      const mx=(n._x+ch._x)/2,my=(n._y+NH+ch._y)/2;
+      el("rect",{x:mx-14,y:my-10,width:28,height:18,rx:9,fill:"var(--panel)",stroke:"var(--line)"},g);
+      el("text",{x:mx,y:my+3.5,"text-anchor":"middle","font-size":"12","font-weight":"700"},g).textContent=lab;
+    });
+    const g=el("g",{class:"node"+(fresh?" fresh":""),tabindex:0,role:"button"},ng);
+    const x=n._x-NW/2,y=n._y,isSel=(!n.split&&n===D.sel)||n===D.inspect;
+    el("rect",{x,y,width:NW,height:NH,rx:9,fill:"var(--panel)",stroke:isSel?"var(--new)":"var(--line)","stroke-width":isSel?3:1.2},g);
+    if(!n.split){const col=n.o>n.n?"var(--cancel)":n.n>n.o?"var(--stay)":"var(--muted)";el("rect",{x,y,width:NW,height:NH,rx:9,fill:col,opacity:.18,"pointer-events":"none"},g);el("rect",{x,y:y+NH-6,width:NW,height:6,fill:col,"pointer-events":"none"},g);}
+    const t1=el("text",{x:n._x,y:y+20,"text-anchor":"middle","font-size":"14","font-weight":"700"},g);
+    if(n.split){t1.textContent=`${NAME[n.split.v]} < ${fmtT(n.split.t)}?`;}
+    else t1.textContent=n.o>n.n?"Predict: owner":n.n>n.o?"Predict: non-owner":"Tie";
+    const t2=el("text",{x:n._x,y:y+38,"text-anchor":"middle","font-size":"13","font-weight":"700"},g);
+    const a=el("tspan",{fill:"var(--cancel)"},t2);a.textContent=n.o+"◆  ";const b=el("tspan",{},t2);b.textContent=n.n+"●";
+    el("text",{x:n._x,y:y+55,"text-anchor":"middle","font-size":"12.5",fill:"var(--muted)"},g).textContent=`${S} = ${f3(imp(n.o,n.n))}`+(n.split?`   #${n.split.num}`:"");
+    const act=()=>{if(D.busy)return;D.prev=null;if(n.split){D.inspect=D.inspect===n?null:n;}else{D.inspect=null;D.sel=n;}renderAll();};
+    g.addEventListener("click",act);g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();act();}});
+  });
+  nodes().forEach(n=>D.drawn.add(n.id));
+  const L=leaves(),acc=L.reduce((s,l)=>s+Math.max(l.o,l.n),0)/D.data.length;
+  $("dtStats").textContent=`${D.hist.length} cut${D.hist.length===1?"":"s"}, ${L.length} leaves, depth ${maxD}, training accuracy ${Math.round(acc*100)}%`;
+}
+function syncButtons(){
+  $("dtBest").disabled=D.busy||!D.sel||D.sel.split||pure(D.sel);
+  $("dtUndo").disabled=D.busy||!D.hist.length;$("dtReset").disabled=D.busy;
+  $("dtGrow").textContent=D.busy?"Stop growing":"Grow the rest of the tree";
+  $("dtGrow").disabled=!D.busy&&!growable();
+}
+function growable(){return leaves().find(l=>!pure(l)&&l.depth<D.maxDepth&&l.idx.length>1&&best(l)&&best(l).gain>1e-9)||null;}
+function drawProg(){
+  const svg=$("dtProg");svg.innerHTML="";const G=D.imp==="gini",S=G?"Gini":"entropy",Nall=D.data.length;
+  $("dtProgTitle").textContent=`How much ${S} is left after each cut?`;
+  $("dtProgHint").textContent=`The line shows the tree's remaining ${S}: the average ${S} of its leaves, weighted by how many households each leaf holds. Each bar is the drop from one cut, equal to that cut's ${G?"Gini decrease":"information gain"} × the share of households in the region it split. The dashed gold step previews the cut you're testing.`;
+  const steps=[{h:imp(D.tree.o,D.tree.n),drop:0}];
+  D.hist.forEach(n=>{const c=cands(n,n.split.v).find(c=>Math.abs(c.t-n.split.t)<1e-9);const share=n.idx.length/Nall,drop=c?c.gain*share:0;
+    steps.push({h:steps[steps.length-1].h-drop,drop,gain:c?c.gain:0,share,n,label:`${NAME[n.split.v]} < ${fmtT(n.split.t)}`});});
+  const a=activeCut();let prev=null;
+  if(a.c&&(a.mode==="hover"||a.mode==="best")){const share=a.node.idx.length/Nall;prev={h:steps[steps.length-1].h-a.c.gain*share,drop:a.c.gain*share,gain:a.c.gain,share,label:`${NAME[a.c.v]} < ${fmtT(a.c.t)}`};}
+  const nx=Math.max(steps.length-1+(prev?1:0),5);
+  const ml=56,mr=20,mt=16,mb=44,w=900-ml-mr,h=250-mt-mb,tstep=steps[0].h>0.6?0.25:0.1,top=Math.max(tstep,Math.ceil(steps[0].h*1.05/tstep)*tstep);
+  const x=i=>ml+i/nx*w,y=v=>mt+(1-v/top)*h,bw=Math.min(36,w/nx*0.45);
+  const ax=el("g",{class:"axis"},svg);
+  for(let v=0;v<=top+1e-9;v+=tstep){el("line",{x1:ml,x2:ml+w,y1:y(v),y2:y(v),"stroke-dasharray":"2 4"},ax);el("text",{x:ml-6,y:y(v)+4,"text-anchor":"end"},ax).textContent=v.toFixed(2);}
+  for(let i=0;i<=nx;i++)el("text",{x:x(i),y:mt+h+18,"text-anchor":"middle"},ax).textContent=i;
+  el("text",{x:ml+w/2,y:246,"text-anchor":"middle",class:"axtitle"},ax).textContent="Number of cuts made";
+  // drop bars, hanging from the previous level
+  steps.forEach((st,i)=>{if(!i)return;const yt=y(steps[i-1].h),yb=y(st.h);
+    const r=el("rect",{x:x(i)-bw/2,y:yt,width:bw,height:Math.max(1,yb-yt),fill:"var(--accent)",opacity:.22,stroke:"var(--accent)","stroke-width":1},svg);
+    el("title",{},r).textContent=`Cut #${i}: ${st.label}. ${G?"Gini decrease":"Gain"} ${f3(st.gain)} × ${st.idx||Math.round(st.share*Nall)}/${Nall} households = drop of ${f3(st.drop)}`;
+    if(yb-yt>16&&nx<=14)el("text",{x:x(i)+bw/2+4,y:(yt+yb)/2+4,"font-size":"12","font-weight":"700",fill:"var(--accent)","font-family":"Source Sans 3, sans-serif"},svg).textContent="−"+st.drop.toFixed(3);
+  });
+  if(prev){const i=steps.length,yt=y(steps[i-1].h),yb=y(prev.h);
+    el("rect",{x:x(i)-bw/2,y:yt,width:bw,height:Math.max(1,yb-yt),fill:"var(--new)",opacity:.3,stroke:"var(--new)","stroke-dasharray":"4 3"},svg);
+    el("path",{d:`M${x(i-1)},${yt}H${x(i)}V${yb}`,fill:"none",stroke:"var(--new)","stroke-width":2.5,"stroke-dasharray":"6 4"},svg);
+    el("circle",{cx:x(i),cy:yb,r:5,fill:"var(--panel)",stroke:"var(--new)","stroke-width":2.5},svg);
+    el("text",{x:x(i)+bw/2+4,y:yb+4,"font-size":"12","font-weight":"700",fill:"var(--ink)","font-family":"Source Sans 3, sans-serif"},svg).textContent=`${prev.h.toFixed(3)} if you cut here`;}
+  // remaining-entropy staircase
+  let d=`M${x(0)},${y(steps[0].h)}`;steps.forEach((st,i)=>{if(i)d+=`H${x(i)}V${y(st.h)}`;});
+  el("path",{d,fill:"none",stroke:"var(--ink)","stroke-width":2.6},svg);
+  steps.forEach((st,i)=>{const c=el("circle",{cx:x(i),cy:y(st.h),r:i===steps.length-1?5.5:4,fill:"var(--ink)"},svg);el("title",{},c).textContent=`After ${i} cut${i===1?"":"s"}: ${S} ${f3(st.h)}`;});
+  const last=steps[steps.length-1],removed=steps[0].h>0?(1-last.h/steps[0].h):0;
+  $("dtProgSum").textContent=`${f3(steps[0].h)} → ${f3(last.h)} after ${steps.length-1} cut${steps.length===2?"":"s"} (${Math.round(removed*100)}% of the starting ${S} removed)`;
+}
+function renderAll(){drawPlot();drawCalc();drawGain();drawProg();drawTree();syncButtons();}
+
+// ---------- interaction ----------
+function svgPt(e){const svg=$("dtPlot"),p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
+function cutAt(e){
+  const p=svgPt(e);if(p.x<ML||p.x>ML+W||p.y<MT||p.y>MT+H)return null;
+  const x=Xi(p.x),y=Yi(p.y),node=leafAt(x,y);if(pure(node)||node.idx.length<2)return {node,c:null};
+  const cs=cands(node,D.dir);if(!cs.length)return {node,c:null};
+  const val=D.dir==="inc"?x:y;let c=cs[0];cs.forEach(k=>{if(Math.abs(k.t-val)<Math.abs(c.t-val))c=k;});return {node,c};
+}
+$("dtPlot").addEventListener("mousemove",e=>{if(D.busy)return;const r=cutAt(e);const np=r&&r.c?r:null;
+  if((np&&D.prev&&np.node===D.prev.node&&np.c.t===D.prev.c.t&&np.c.v===D.prev.c.v)||(!np&&!D.prev))return;
+  D.prev=np;if(np)D.inspect=null;drawPlot();drawCalc();drawGain();drawProg();});
+$("dtPlot").addEventListener("mouseleave",()=>{if(D.busy||!D.prev)return;D.prev=null;drawPlot();drawCalc();drawGain();drawProg();});
+$("dtPlot").addEventListener("click",e=>{if(D.busy)return;const r=cutAt(e);if(!r)return;
+  if(!r.c){D.sel=r.node;D.inspect=null;D.prev=null;renderAll();return;}
+  apply(r.node,r.c.v,r.c.t);renderAll();});
+function seg(id,fn){$(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{if(D.busy)return;$(id).querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));fn(b.dataset.v);renderAll();});}
+seg("dtDirSeg",v=>{D.dir=v;D.prev=null;});seg("dtImpSeg",v=>{D.imp=v;});
+$("dtDepth").onchange=e=>{D.maxDepth=+e.target.value;syncButtons();};
+$("dtBest").onclick=()=>{if(D.busy||!D.sel||pure(D.sel))return;const b=best(D.sel);if(b){apply(D.sel,b.v,b.t);renderAll();}};
+$("dtUndo").onclick=()=>{if(D.busy)return;const n=D.hist.pop();if(!n)return;n.split=null;n.left=n.right=null;D.sel=n;D.inspect=null;D.prev=null;renderAll();};
+$("dtReset").onclick=()=>{if(D.busy)return;setup(D.data);};
+$("dtGrow").onclick=async()=>{
+  if(D.busy){D.stop=true;return;}
+  D.busy=true;D.stop=false;D.prev=null;D.inspect=null;syncButtons();
+  // grow breadth-first: shallowest impure leaf first
+  while(!D.stop){
+    const q=[D.tree];let target=null;
+    while(q.length){const n=q.shift();if(!n.split){if(!pure(n)&&n.depth<D.maxDepth&&n.idx.length>1){const b=best(n);if(b&&b.gain>1e-9){target=n;break;}}}else q.push(n.left,n.right);}
+    if(!target)break;
+    D.sel=target;drawPlot();drawCalc();drawGain();drawProg();drawTree();
+    await sleep(900);if(D.stop)break;
+    const b=best(target);apply(target,b.v,b.t);drawPlot();drawCalc();drawGain();drawProg();drawTree();
+    await sleep(500);
+  }
+  D.busy=false;D.stop=false;renderAll();
+};
+$("dtData").value=DEF;
+$("dtUse").onclick=()=>{if(D.busy)return;const rows=parse($("dtData").value);
+  if(rows.length<4||!rows.some(r=>r.y)||!rows.some(r=>!r.y)){$("dtDataMsg").textContent="Need at least 4 households, including both owners and non-owners.";return;}
+  $("dtDataMsg").textContent=`Loaded ${rows.length} households.`;$("dtPts").innerHTML="";setup(rows);};
+$("dtRestore").onclick=()=>{if(D.busy)return;$("dtData").value=DEF;$("dtDataMsg").textContent="";$("dtPts").innerHTML="";setup(parse(DEF));};
+setup(parse(DEF));
+})();
+</script>
+
+</body>
+</html>
